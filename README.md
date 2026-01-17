@@ -1,115 +1,50 @@
-# 🚦 Arduino Traffic Light System with Pedestrian Button
+# Arduino Traffic Light Controller with Pedestrian Interrupt
 
-A simple and interactive **traffic signal system** built using **Arduino UNO**, LEDs, resistors, and a push button.
-When no one presses the button, the **green light stays ON**.
-When the pedestrian button is pressed, the system switches to **yellow → red**, giving safe crossing time.
+## Project Overview
 
-I have also added a video demo in this repository to show the working project.
+This repository implements a dual-road traffic light control system using an Arduino Uno. The firmware is designed around a Finite State Machine (FSM) architecture to ensure predictable transitions between traffic phases. It features a non-blocking timing mechanism and utilizes hardware interrupts to handle pedestrian crossing requests asynchronously, prioritizing pedestrian safety without halting system operations.
 
-## Features
+## System Architecture
 
-* 🟢 **Green light ON by default**
-* 🟡 **Yellow warning light when the pedestrian button is pressed**
-* 🔴 **Red light for pedestrian crossing**
-* ⏱️ Includes real timing delays (5s for waiting, 10s for crossing)
-* 🖥️ Serial Monitor logs the status in real time
-* 🔌 Works on an Arduino UNO with simple components (no complex hardware)
+The control logic operates on five distinct states:
 
----
+1. Road 1 Green: Primary road access.
+2. Road 1 Yellow: Transition phase for Road 1.
+3. All Red: Safety buffer clearing the intersection.
+4. Road 2 Green: Secondary road access.
+5. Road 2 Yellow: Transition phase for Road 2.
 
-## Components Used
+### Timing and Interrupts
 
-* Arduino Uno
-* 3 LEDs (Red, Yellow, Green)
-* Push Button
-* 220Ω resistors
-* Breadboard + Jumper wires
-* USB cable for power/programming
+- Non-Blocking I/O: The system uses millis() rather than blocking delay() functions. This allows the microcontroller to continuously poll inputs and maintain internal timers simultaneously.
+- Interrupt Service Routine (ISR): The pedestrian button is attached to external interrupt pin 2. A falling edge trigger (button press) instantly flags a request variable, which dictates the logic flow of the main loop to shorten the current green cycle if necessary.
 
-## 🔌 Circuit Diagram
+## Hardware Specifications
 
-The LEDs are connected to digital pins:
+### Pin Configuration
 
-| LED    | Arduino Pin |
-| ------ | ----------- |
-| Green  | 12          |
-| Yellow | 11          |
-| Red    | 10          |
+| Component | Pin | Mode | Description |
+| :--- | :--- | :--- | :--- |
+| Red 1 | 3 | OUTPUT | Road 1 Red Signal |
+| Yellow 1 | 4 | OUTPUT | Road 1 Yellow Signal |
+| Green 1 | 5 | OUTPUT | Road 1 Green Signal |
+| Red 2 | 8 | OUTPUT | Road 2 Red Signal |
+| Green 2 | 9 | OUTPUT | Road 2 Green Signal |
+| Button | 13 | INPUT_PULLUP | Pedestrian Request (Active Low) |
 
-The push button is connected to **pin 7** (with ground reference).
+### Circuit Wiring
 
-I’ve added the full circuit diagram image in this repo.
+The circuit utilizes the Arduino's internal pull-up resistors for the input button to minimize external components.
 
-## 💻 Code
+- LEDs: Connected to respective digital pins with 220 ohm current-limiting resistors in series to Ground.
+- Pushbutton: Connected between Pin 2 and Ground. No external pull-down or pull-up resistor is required.
 
-```cpp
-int red=10;
-int yellow=11;
-int green=12;
+## Deployment Instructions
 
-int pushButton=7;
-int readPushbutton=0;
+1. Hardware Assembly: Wire the components according to the Pin Configuration table and the provided circuit diagram. Ensure the pushbutton connects Pin 2 to Ground directly.
+2. Firmware Upload: Open the source code in the Arduino IDE, select the appropriate board and COM port, and upload the sketch.
+3. Serial Monitoring: The system outputs state transition logs via the Serial interface. Set the Serial Monitor baud rate to 9600 to view these logs.
 
-void setup()
-{
-  pinMode(red,OUTPUT);
-  pinMode(yellow,OUTPUT);
-  pinMode(green,OUTPUT);
-  pinMode(pushButton,INPUT);
-  
-  digitalWrite(red,LOW);
-  digitalWrite(yellow,LOW);
-  digitalWrite(green,LOW);
-  
-  Serial.begin(9600);
-}
+## Operational Logic
 
-void loop()
-{
-  int readPushbutton=digitalRead(pushButton);
-  
-  // Default condition (no pedestrian)
-  if(readPushbutton==0)
-  {
-    digitalWrite(green,HIGH);
-    digitalWrite(yellow,LOW);
-    digitalWrite(red,LOW);
-  }
-  
-  // Pedestrian button pressed
-  else if(readPushbutton==1)
-  {
-    digitalWrite(green,LOW);
-    digitalWrite(yellow,HIGH);
-    digitalWrite(red,LOW);
-    Serial.print("Pedestrian is waiting...\n");
-    delay(5000);
-    
-    digitalWrite(green,LOW);
-    digitalWrite(yellow,LOW);
-    digitalWrite(red,HIGH);
-    Serial.print("Pedestrian crossing...\n");
-    delay(10000);
-  }
-}
-```
-
----
-
-## 🎬 Demo Video
-
-I have included a **demo video** in this repository showing the real hardware working.
-[Demo Video](https://drive.google.com/file/d/1LXzvP7Bqk9bIUsAibFopFrqsE1RTqo0G/view?usp=drivesdk)
-
-
-## 📚 How It Works
-
-1. **Normal mode:** Green LED stays ON
-2. **Button pressed:**
-
-   * Yellow light turns ON → indicates transition
-   * After delay, Red light turns ON → pedestrians cross
-3. After crossing time, the system returns to **green**
-
-This simulates a basic real-world pedestrian traffic signal system.
-
+Upon initialization, the system defaults to Road 1 Green. The cycle proceeds based on defined time constants. If the pedestrian button is pressed while Road 1 is Green, the system registers the interrupt, overrides the remaining wait time, and initiates the transition to Road 1 Yellow, accelerating the cycle to allow the pedestrian crossing phase (implied during the traffic switch).
